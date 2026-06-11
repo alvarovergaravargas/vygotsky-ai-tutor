@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vygotsky AI-Tutor</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    :root {
+      --blue-neon: #38bdf8;
+      --blue-deep: #0f172a;
+      --blue-mid: #1e3a8a;
+      --slate-soft: #cbd5e1;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.25), transparent 30%),
+        radial-gradient(circle at top right, rgba(37, 99, 235, 0.20), transparent 35%),
+        linear-gradient(135deg, #020617 0%, #0f172a 45%, #111827 100%);
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    .grid-bg {
+      background-image:
+        linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+      background-size: 34px 34px;
+    }
+
+    .glass {
+      background: rgba(15, 23, 42, 0.72);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 24px 80px rgba(2, 6, 23, 0.55);
+    }
+
+    .panel {
+      background: rgba(15, 23, 42, 0.82);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 20px 60px rgba(2, 6, 23, 0.35);
+    }
+
+    .neon-border {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .neon-border::before {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      background: linear-gradient(120deg, transparent, rgba(56, 189, 248, 0.65), transparent);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      z-index: 0;
+    }
+
+    .neon-border:hover::before {
+      opacity: 1;
+    }
+
+    .neon-border > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .perspective {
+      perspective: 1200px;
+    }
+
+    .preserve-3d {
+      transform-style: preserve-3d;
+    }
+
+    .backface-hidden {
+      backface-visibility: hidden;
+    }
+
+    .rotate-y-180 {
+      transform: rotateY(180deg);
+    }
+
+    .flip-card-inner {
+      transition: transform 0.75s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .flip-card.is-flipped .flip-card-inner {
+      transform: rotateY(180deg);
+    }
+
+    .soft-glow {
+      box-shadow:
+        0 0 0 1px rgba(56, 189, 248, 0.2),
+        0 0 30px rgba(56, 189, 248, 0.12);
+    }
+
+    .pulse-glow {
+      animation: pulseGlow 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% {
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25), 0 0 24px rgba(56, 189, 248, 0.10);
+      }
+      50% {
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.55), 0 0 42px rgba(56, 189, 248, 0.25);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.35s ease both;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .option-selected {
+      border-color: rgba(56, 189, 248, 0.9) !important;
+      background: rgba(14, 165, 233, 0.14) !important;
+      color: #e0f2fe !important;
+    }
+
+    .option-correct {
+      border-color: rgba(34, 211, 238, 0.85) !important;
+      background: rgba(6, 182, 212, 0.18) !important;
+      color: #ecfeff !important;
+    }
+
+    .option-wrong {
+      border-color: rgba(96, 165, 250, 0.65) !important;
+      background: rgba(30, 64, 175, 0.16) !important;
+      color: #dbeafe !important;
+    }
+  </style>
+</head>
+
+<body class="grid-bg">
+  <div class="min-h-screen">
+    <header class="sticky top-0 z-50 border-b border-slate-700/40 bg-slate-950/70 backdrop-blur-xl">
+      <nav class="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+        <button class="flex items-center gap-3 text-left" data-nav="flashcards" type="button">
+          <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-300 ring-1 ring-sky-300/30 soft-glow">
+            <span class="text-xl font-black">V</span>
+          </div>
+          <div>
+            <p class="text-lg font-black tracking-tight text-white">Vygotsky AI-Tutor</p>
+            <p class="text-xs font-semibold text-slate-400">Mini-juego de repaso</p>
+          </div>
+        </button>
+
+        <div class="hidden items-center gap-2 rounded-2xl border border-slate-700/60 bg-slate-900/80 p-1 md:flex">
+          <button class="nav-pill rounded-xl px-4 py-2 text-sm font-bold transition" data-nav="flashcards" type="button">Flashcards</button>
+          <button class="nav-pill rounded-xl px-4 py-2 text-sm font-bold transition" data-nav="quiz" type="button">Entrenamiento</button>
+          <button class="nav-pill rounded-xl px-4 py-2 text-sm font-bold transition" data-nav="challenge" type="button">Desafío</button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <div class="hidden rounded-2xl border border-slate-700/60 bg-slate-900/80 px-4 py-2 sm:block">
+            <p class="text-xs font-bold uppercase tracking-widest text-slate-500">Mejor puntaje</p>
+            <p class="text-right text-lg font-black text-sky-300" id="bestScoreLabel">0</p>
+          </div>
+
+          <button
+            class="rounded-xl bg-sky-400 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-sky-300 focus:outline-none focus:ring-4 focus:ring-sky-400/30"
+            data-start-quiz="training"
+            type="button"
+          >
+            Jugar
+          </button>
+        </div>
+      </nav>
+
+      <div class="mx-auto grid max-w-7xl grid-cols-3 gap-2 px-5 pb-4 md:hidden">
+        <button class="mobile-nav-pill rounded-xl px-3 py-2 text-xs font-bold transition" data-nav="flashcards" type="button">Flashcards</button>
+        <button class="mobile-nav-pill rounded-xl px-3 py-2 text-xs font-bold transition" data-nav="quiz" type="button">Quiz</button>
+        <button class="mobile-nav-pill rounded-xl px-3 py-2 text-xs font-bold transition" data-nav="challenge" type="button">Desafío</button>
+      </div>
+    </header>
+
+    <main class="mx-auto max-w-7xl px-5 py-8 md:py-10">
+      <section class="glass overflow-hidden rounded-[2rem]">
+        <div class="relative px-6 py-10 md:px-10 md:py-14">
+          <div class="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl"></div>
+          <div class="absolute -bottom-24 left-20 h-72 w-72 rounded-full bg-blue-700/20 blur-3xl"></div>
+
+          <div class="relative grid gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+            <div>
+              <span class="inline-flex rounded-full border border-sky-300/25 bg-sky-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-sky-200">
+                Teoría de los Aprendizajes
+              </span>
+
+              <h1 class="mt-6 max-w-3xl text-4xl font-black tracking-tight text-white md:text-6xl">
+                Aprende Vygotsky con tarjetas, retos y andamiaje.
+              </h1>
+
+              <p class="mt-5 max-w-2xl text-base leading-8 text-slate-300 md:text-lg">
+                Estudia conceptos clave, responde preguntas de opción múltiple y recibe pistas progresivas cuando necesites apoyo para avanzar.
+              </p>
+
+              <div class="mt-8 flex flex-wrap gap-3">
+                <button
+                  class="rounded-2xl bg-sky-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-sky-300 focus:outline-none focus:ring-4 focus:ring-sky-400/30"
+                  data-start-quiz="training"
+                  type="button"
+                >
+                  Iniciar entrenamiento
+                </button>
+
+                <button
+                  class="rounded-2xl border border-slate-600 bg-slate-900/70 px-5 py-3 text-sm font-black text-slate-100 transition hover:border-sky-300/60 hover:text-sky-200 focus:outline-none focus:ring-4 focus:ring-sky-400/20"
+                  data-nav="flashcards"
+                  type="button"
+                >
+                  Repasar tarjetas
+                </button>
+              </div>
+            </div>
+
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+              <div class="panel rounded-3xl p-5">
+                <div class="flex items-center justify-between">
+                  <p class="text-sm font-black uppercase tracking-widest text-slate-500">Nivel actual</p>
+                  <span class="rounded-full bg-sky-400/10 px-3 py-1 text-xs font-black text-sky-200 ring-1 ring-sky-300/20" id="levelBadge">Explorador</span>
+                </div>
+
+                <div class="mt-5 h-3 overflow-hidden rounded-full bg-slate-800">
+                  <div id="levelProgress" class="h-full rounded-full bg-sky-400 transition-all duration-500" style="width: 0%"></div>
+                </div>
+
+                <p class="mt-4 text-sm leading-6 text-slate-400">
+                  Sube de nivel con aciertos al primer intento, rachas y energía cognitiva.
+                </p>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="panel rounded-3xl p-5">
+                  <p class="text-xs font-black uppercase tracking-widest text-slate-500">Tarjetas vistas</p>
+                  <p class="mt-2 text-3xl font-black text-white" id="cardsReviewedLabel">0</p>
+                </div>
+
+                <div class="panel rounded-3xl p-5">
+                  <p class="text-xs font-black uppercase tracking-widest text-slate-500">Racha máxima</p>
+                  <p class="mt-2 text-3xl font-black text-sky-300" id="maxStreakLabel">0</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-8 grid gap-4 md:grid-cols-4" id="statsPanel">
+        <div class="panel rounded-3xl p-5">
+          <p class="text-xs font-black uppercase tracking-widest text-slate-500">Puntos</p>
+          <p class="mt-2 text-3xl font-black text-white" id="scoreLabel">0</p>
+        </div>
+
+        <div class="panel rounded-3xl p-5">
+          <p class="text-xs font-black uppercase tracking-widest text-slate-500">Racha</p>
+          <p class="mt-2 text-3xl font-black text-sky-300" id="streakLabel">0</p>
+        </div>
+
+        <div class="panel rounded-3xl p-5">
+          <p class="text-xs font-black uppercase tracking-widest text-slate-500">Energía cognitiva</p>
+          <p class="mt-2 text-3xl font-black text-cyan-200" id="energyLabel">100%</p>
+        </div>
+
+        <div class="panel rounded-3xl p-5">
+          <p class="text-xs font-black uppercase tracking-widest text-slate-500">Progreso quiz</p>
+          <p class="mt-2 text-3xl font-black text-blue-200" id="quizProgressLabel">0/5</p>
+        </div>
+      </section>
+
+      <section class="mt-8">
+        <div class="mb-5 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p class="text-sm font-black uppercase tracking-[0.22em] text-sky-300" id="sectionEyebrow">Modo estudio</p>
+            <h2 class="mt-2 text-3xl font-black text-white" id="sectionTitle">Tarjetas de Estudio</h2>
+            <p class="mt-2 max-w-2xl text-sm leading-6 text-slate-400" id="sectionSubtitle">
+              Haz clic en una tarjeta para revelar su definición. Cada tarjeta revisada suma a tu progreso.
+            </p>
+          </div>
+
+          <div class="flex rounded-2xl border border-slate-700/60 bg-slate-900/80 p-1">
+            <button class="view-tab rounded-xl px-4 py-2 text-sm font-bold transition" data-nav="flashcards" type="button">Flashcards</button>
+            <button class="view-tab rounded-xl px-4 py-2 text-sm font-bold transition" data-nav="quiz" type="button">Quiz</button>
+            <button class="view-tab rounded-xl px-4 py-2 text-sm font-bold transition" data-nav="challenge" type="button">Desafío</button>
+          </div>
+        </div>
+
+        <div id="flashcardsView" class="fade-in"></div>
+        <div id="quizView" class="hidden fade-in"></div>
+        <div id="challengeView" class="hidden fade-in"></div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const knowledgeBase = [
+      {
+        concept: "Ley Genética General del Desarrollo",
+        definition: "Toda función psicológica aparece dos veces: primero en el plano social, interpsicológico, en interacción con otros, y luego en el plano individual, intrapsicológico, al interiorizarse."
+      },
+      {
+        concept: "Mediación Semiótica",
+        definition: "El ser humano se relaciona con el mundo a través de mediadores culturales, como herramientas físicas y signos, especialmente el lenguaje."
+      },
+      {
+        concept: "Zona de Desarrollo Próximo (ZDP)",
+        definition: "La distancia entre el nivel de desarrollo real, lo que el alumno hace solo, y el nivel potencial, lo que logra con orientación."
+      },
+      {
+        concept: "Andamiaje",
+        definition: "Apoyo temporal, ajustado y progresivo que brinda el docente o compañero hasta que el estudiante realiza la tarea de forma independiente."
+      },
+      {
+        concept: "Doble Estimulación Funcional",
+        definition: "Experimento que demuestra cómo los sujetos usan herramientas o signos, segundo estímulo, para resolver tareas complejas, primer estímulo."
+      },
+      {
+        concept: "Bloques de Vygotsky-Sájarov",
+        definition: "Experimento sobre la formación de conceptos. Demuestra que los niños pasan por agrupaciones desorganizadas, pseudoconceptos y finalmente conceptos verdaderos mediante comparación y mediación."
+      },
+      {
+        concept: "Investigaciones de Luria",
+        definition: "Estudios en Uzbekistán que demostraron que el pensamiento humano está influido por la cultura y la educación escolarizada, fomentando categorías abstractas."
+      },
+      {
+        concept: "Rol del Docente",
+        definition: "Actúa como guía, mediador y facilitador, identificando la ZDP para ofrecer retos alcanzables y promoviendo la interacción social."
+      }
+    ];
+
+    const questionBank = [
+      {
+        question: "¿Qué concepto explica que una función psicológica aparece primero en el plano social y luego en el plano individual?",
+        options: [
+          "Ley Genética General del Desarrollo",
+          "Mediación Semiótica",
+          "Andamiaje",
+          "Investigaciones de Luria"
+        ],
+        answer: "Ley Genética General del Desarrollo",
+        scaffolds: [
+          "Observa la relación entre interacción con otros e interiorización.",
+          "El concepto diferencia el plano interpsicológico del plano intrapsicológico.",
+          "Piensa en una función que aparece dos veces: primero socialmente y luego dentro del individuo."
+        ]
+      },
+      {
+        question: "¿Qué concepto describe la relación del ser humano con el mundo mediante herramientas físicas y signos, especialmente el lenguaje?",
+        options: [
+          "Mediación Semiótica",
+          "Zona de Desarrollo Próximo (ZDP)",
+          "Doble Estimulación Funcional",
+          "Rol del Docente"
+        ],
+        answer: "Mediación Semiótica",
+        scaffolds: [
+          "Busca el concepto centrado en mediadores culturales.",
+          "La pista clave está en herramientas físicas, signos y lenguaje.",
+          "No se trata de una distancia entre niveles, sino de cómo el sujeto se relaciona con el mundo."
+        ]
+      },
+      {
+        question: "¿Qué concepto se define como la distancia entre el nivel de desarrollo real y el nivel potencial?",
+        options: [
+          "Zona de Desarrollo Próximo (ZDP)",
+          "Andamiaje",
+          "Bloques de Vygotsky-Sájarov",
+          "Investigaciones de Luria"
+        ],
+        answer: "Zona de Desarrollo Próximo (ZDP)",
+        scaffolds: [
+          "Compara lo que el alumno logra solo con lo que logra con orientación.",
+          "El nivel real se refiere a lo que el estudiante hace de manera independiente.",
+          "El nivel potencial aparece cuando hay guía u orientación."
+        ]
+      },
+      {
+        question: "¿Qué concepto representa el apoyo temporal, ajustado y progresivo que se retira cuando el estudiante logra independencia?",
+        options: [
+          "Andamiaje",
+          "Ley Genética General del Desarrollo",
+          "Mediación Semiótica",
+          "Doble Estimulación Funcional"
+        ],
+        answer: "Andamiaje",
+        scaffolds: [
+          "Fíjate en la idea de apoyo que no es permanente.",
+          "Este apoyo puede venir del docente o de un compañero.",
+          "La meta es que el estudiante termine realizando la tarea de forma independiente."
+        ]
+      },
+      {
+        question: "¿Qué experimento demuestra cómo se usan herramientas o signos como segundo estímulo para resolver una tarea compleja?",
+        options: [
+          "Doble Estimulación Funcional",
+          "Bloques de Vygotsky-Sájarov",
+          "Investigaciones de Luria",
+          "Rol del Docente"
+        ],
+        answer: "Doble Estimulación Funcional",
+        scaffolds: [
+          "Identifica el experimento que distingue entre primer estímulo y segundo estímulo.",
+          "El primer estímulo es la tarea compleja.",
+          "El segundo estímulo funciona como herramienta o signo para resolver la tarea."
+        ]
+      },
+      {
+        question: "¿Qué experimento estudia la formación de conceptos mediante agrupaciones desorganizadas, pseudoconceptos y conceptos verdaderos?",
+        options: [
+          "Bloques de Vygotsky-Sájarov",
+          "Doble Estimulación Funcional",
+          "Zona de Desarrollo Próximo (ZDP)",
+          "Mediación Semiótica"
+        ],
+        answer: "Bloques de Vygotsky-Sájarov",
+        scaffolds: [
+          "Busca el experimento relacionado con formación de conceptos.",
+          "La secuencia incluye agrupaciones desorganizadas y pseudoconceptos.",
+          "La comparación y la mediación conducen hacia conceptos verdaderos."
+        ]
+      },
+      {
+        question: "¿Qué investigaciones demostraron que el pensamiento humano está influido por la cultura y la educación escolarizada?",
+        options: [
+          "Investigaciones de Luria",
+          "Rol del Docente",
+          "Ley Genética General del Desarrollo",
+          "Andamiaje"
+        ],
+        answer: "Investigaciones de Luria",
+        scaffolds: [
+          "Recuerda los estudios realizados en Uzbekistán.",
+          "La idea central es que cultura y educación escolarizada influyen en el pensamiento.",
+          "El resultado destaca el desarrollo de categorías abstractas."
+        ]
+      },
+      {
+        question: "¿Qué rol cumple el docente según la base de conocimientos de esta app?",
+        options: [
+          "Guía, mediador y facilitador",
+          "Segundo estímulo de una tarea compleja",
+          "Agrupación desorganizada",
+          "Nivel de desarrollo real"
+        ],
+        answer: "Guía, mediador y facilitador",
+        scaffolds: [
+          "Piensa en quien identifica la ZDP del estudiante.",
+          "Este rol ofrece retos alcanzables.",
+          "También promueve la interacción social durante el aprendizaje."
+        ]
+      },
+      {
+        question: "¿Qué concepto se relaciona directamente con la diferencia entre lo que el alumno hace solo y lo que logra con ayuda?",
+        options: [
+          "Zona de Desarrollo Próximo (ZDP)",
+          "Mediación Semiótica",
+          "Investigaciones de Luria",
+          "Bloques de Vygotsky-Sájarov"
+        ],
+        answer: "Zona de Desarrollo Próximo (ZDP)",
+        scaffolds: [
+          "La clave está en comparar independencia con orientación.",
+          "El desarrollo real corresponde a lo que el alumno hace solo.",
+          "El desarrollo potencial aparece cuando el alumno logra avanzar con apoyo."
+        ]
+      },
+      {
+        question: "¿Qué concepto destaca especialmente el lenguaje como signo mediador?",
+        options: [
+          "Mediación Semiótica",
+          "Andamiaje",
+          "Investigaciones de Luria",
+          "Rol del Docente"
+        ],
+        answer: "Mediación Semiótica",
+        scaffolds: [
+          "Busca el concepto centrado en signos.",
+          "El lenguaje aparece como mediador cultural.",
+          "No se enfoca en el apoyo temporal, sino en la relación entre sujeto, cultura y mundo."
+        ]
+      }
+    ];
+
+    const appState = {
+      view: "flashcards",
+      reviewedCards: new Set(),
+      bestScore: Number(localStorage.getItem("vygotskyBestScore") || 0),
+      maxStreakGlobal: Number(localStorage.getItem("vygotskyMaxStreak") || 0),
+      activeGame: null,
+      timerId: null
+    };
+
+    const views = {
+      flashcards: document.getElementById("flashcardsView"),
+      quiz: document.getElementById("quizView"),
+      challenge: document.getElementById("challengeView")
+    };
+
+    const labels = {
+      sectionEyebrow: document.getElementById("sectionEyebrow"),
+      sectionTitle: document.getElementById("sectionTitle"),
+      sectionSubtitle: document.getElementById("sectionSubtitle"),
+      bestScore: document.getElementById("bestScoreLabel"),
+      score: document.getElementById("scoreLabel"),
+      streak: document.getElementById("streakLabel"),
+      energy: document.getElementById("energyLabel"),
+      progress: document.getElementById("quizProgressLabel"),
+      cardsReviewed: document.getElementById("cardsReviewedLabel"),
+      maxStreak: document.getElementById("maxStreakLabel"),
+      levelBadge: document.getElementById("levelBadge"),
+      levelProgress: document.getElementById("levelProgress")
+    };
+
+    function escapeHTML(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function shuffle(array) {
+      const copy = [...array];
+
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+
+      return copy;
+    }
+
+    function getLevel(score) {
+      if (score >= 480) {
+        return { name: "Tutor Vygotskiano", progress: 100 };
+      }
+
+      if (score >= 360) {
+        return { name: "Mediador Experto", progress: 82 };
+      }
+
+      if (score >= 240) {
+        return { name: "Guía de la ZDP", progress: 62 };
+      }
+
+      if (score >= 120) {
+        return { name: "Aprendiz Activo", progress: 38 };
+      }
+
+      return { name: "Explorador", progress: Math.max(8, Math.round((score / 120) * 30)) };
+    }
+
+    function updateStats() {
+      const game = appState.activeGame;
+      const score = game ? game.score : 0;
+      const streak = game ? game.streak : 0;
+      const energy = game ? game.energy : 100;
+      const progress = game ? `${Math.min(game.index + 1, game.questions.length)}/${game.questions.length}` : "0/5";
+      const level = getLevel(score);
+
+      labels.bestScore.textContent = appState.bestScore;
+      labels.score.textContent = score;
+      labels.streak.textContent = streak;
+      labels.energy.textContent = `${energy}%`;
+      labels.progress.textContent = progress;
+      labels.cardsReviewed.textContent = appState.reviewedCards.size;
+      labels.maxStreak.textContent = Math.max(appState.maxStreakGlobal, game ? game.maxStreak : 0);
+      labels.levelBadge.textContent = level.name;
+      labels.levelProgress.style.width = `${level.progress}%`;
+
+      document.querySelectorAll(".nav-pill, .mobile-nav-pill, .view-tab").forEach(button => {
+        const isActive = button.dataset.nav === appState.view;
+        button.className = isActive
+          ? button.className.replace(/bg-slate-900\/80|text-slate-400|text-slate-300|hover:text-sky-200|hover:border-sky-300\/60/g, "").trim()
+          : button.className;
+
+        if (button.classList.contains("nav-pill")) {
+          button.className = isActive
+            ? "nav-pill rounded-xl bg-sky-400 px-4 py-2 text-sm font-black text-slate-950 transition"
+            : "nav-pill rounded-xl px-4 py-2 text-sm font-bold text-slate-400 transition hover:text-sky-200";
+        }
+
+        if (button.classList.contains("mobile-nav-pill")) {
+          button.className = isActive
+            ? "mobile-nav-pill rounded-xl bg-sky-400 px-3 py-2 text-xs font-black text-slate-950 transition"
+            : "mobile-nav-pill rounded-xl bg-slate-900/80 px-3 py-2 text-xs font-bold text-slate-400 transition hover:text-sky-200";
+        }
+
+        if (button.classList.contains("view-tab")) {
+          button.className = isActive
+            ? "view-tab rounded-xl bg-sky-400 px-4 py-2 text-sm font-black text-slate-950 transition"
+            : "view-tab rounded-xl px-4 py-2 text-sm font-bold text-slate-400 transition hover:text-sky-200";
+        }
+      });
+    }
+
+    function setView(view) {
+      appState.view = view;
+
+      Object.entries(views).forEach(([key, element]) => {
+        element.classList.toggle("hidden", key !== view);
+      });
+
+      if (view === "flashcards") {
+        labels.sectionEyebrow.textContent = "Modo estudio";
+        labels.sectionTitle.textContent = "Tarjetas de Estudio";
+        labels.sectionSubtitle.textContent = "Haz clic en una tarjeta para revelar su definición. Cada tarjeta revisada suma a tu progreso.";
+        renderFlashcards();
+      }
+
+      if (view === "quiz") {
+        labels.sectionEyebrow.textContent = "Modo entrenamiento";
+        labels.sectionTitle.textContent = "Evaluación Dinámica";
+        labels.sectionSubtitle.textContent = "Responde 5 preguntas. Si fallas, recibirás andamiaje progresivo sin revelar la respuesta inmediatamente.";
+        renderQuizIntro("training");
+      }
+
+      if (view === "challenge") {
+        labels.sectionEyebrow.textContent = "Modo desafío";
+        labels.sectionTitle.textContent = "Reto de Mediación";
+        labels.sectionSubtitle.textContent = "Responde contra el tiempo. Las pistas siguen disponibles, pero la energía cognitiva y el reloj presionan.";
+        renderQuizIntro("challenge");
+      }
+
+      updateStats();
+    }
+
+    function renderFlashcards() {
+      views.flashcards.innerHTML = `
+        <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          ${knowledgeBase.map((item, index) => `
+            <button
+              class="flip-card perspective min-h-[19rem] rounded-[1.7rem] text-left focus:outline-none focus:ring-4 focus:ring-sky-400/30 ${appState.reviewedCards.has(index) ? "is-reviewed" : ""}"
+              data-flip-card="${index}"
+              type="button"
+              aria-label="Tarjeta ${index + 1}: ${escapeHTML(item.concept)}"
+            >
+              <div class="flip-card-inner preserve-3d relative h-full min-h-[19rem] w-full">
+                <div class="backface-hidden neon-border absolute inset-0 overflow-hidden rounded-[1.7rem] bg-slate-900 ring-1 ring-slate-700/70">
+                  <div class="flex h-full flex-col justify-between p-6">
+                    <div>
+                      <div class="flex items-center justify-between">
+                        <span class="rounded-full bg-sky-400/10 px-3 py-1 text-xs font-black uppercase tracking-widest text-sky-300 ring-1 ring-sky-300/20">
+                          Concepto
+                        </span>
+                        <span class="text-xs font-black text-slate-500">#${index + 1}</span>
+                      </div>
+
+                      <h3 class="mt-7 text-2xl font-black leading-tight text-white">
+                        ${escapeHTML(item.concept)}
+                      </h3>
+                    </div>
+
+                    <div class="mt-6 flex items-center justify-between border-t border-slate-700/70 pt-4">
+                      <p class="text-sm font-bold text-slate-400">Clic para revelar</p>
+                      <span class="text-sky-300">↻</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="backface-hidden rotate-y-180 absolute inset-0 overflow-hidden rounded-[1.7rem] bg-blue-950 ring-1 ring-sky-300/30 soft-glow">
+                  <div class="flex h-full flex-col justify-between p-6">
+                    <div>
+                      <span class="rounded-full bg-white/10 px-3 py-1 text-xs font-black uppercase tracking-widest text-sky-100 ring-1 ring-white/10">
+                        Definición
+                      </span>
+
+                      <p class="mt-6 text-base leading-7 text-blue-50">
+                        ${escapeHTML(item.definition)}
+                      </p>
+                    </div>
+
+                    <div class="mt-6 flex items-center justify-between border-t border-sky-300/20 pt-4">
+                      <p class="text-sm font-bold text-sky-200">Tarjeta revisada</p>
+                      <span class="text-sky-300">✓</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function createGame(mode) {
+      return {
+        mode,
+        questions: shuffle(questionBank).slice(0, 5).map(question => ({
+          ...question,
+          options: shuffle(question.options)
+        })),
+        index: 0,
+        selectedIndex: null,
+        attempts: 0,
+        score: 0,
+        streak: 0,
+        maxStreak: 0,
+        energy: 100,
+        locked: false,
+        feedback: null,
+        timeLeft: mode === "challenge" ? 90 : null,
+        endedByTime: false
+      };
+    }
+
+    function renderQuizIntro(mode) {
+      const target = mode === "training" ? views.quiz : views.challenge;
+
+      const isChallenge = mode === "challenge";
+
+      target.innerHTML = `
+        <div class="panel mx-auto max-w-4xl rounded-[2rem] p-6 md:p-8">
+          <div class="grid gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+            <div class="rounded-[1.5rem] border border-sky-300/20 bg-sky-400/10 p-6 pulse-glow">
+              <p class="text-xs font-black uppercase tracking-[0.24em] text-sky-200">
+                ${isChallenge ? "Reto cronometrado" : "Quiz adaptativo"}
+              </p>
+
+              <h3 class="mt-4 text-3xl font-black text-white">
+                ${isChallenge ? "Reto de Mediación" : "Entrenamiento con Andamiaje"}
+              </h3>
+
+              <p class="mt-4 text-sm leading-7 text-slate-300">
+                ${isChallenge
+                  ? "Tendrás 90 segundos para responder 5 preguntas. Si fallas, recibirás una pista, pero perderás energía."
+                  : "Responderás 5 preguntas. Si fallas, el sistema te dará una pista progresiva y podrás intentarlo nuevamente."}
+              </p>
+            </div>
+
+            <div>
+              <div class="grid gap-4 sm:grid-cols-3">
+                <div class="rounded-3xl border border-slate-700 bg-slate-950/40 p-5">
+                  <p class="text-xs font-black uppercase tracking-widest text-slate-500">Preguntas</p>
+                  <p class="mt-2 text-3xl font-black text-white">5</p>
+                </div>
+
+                <div class="rounded-3xl border border-slate-700 bg-slate-950/40 p-5">
+                  <p class="text-xs font-black uppercase tracking-widest text-slate-500">Andamiaje</p>
+                  <p class="mt-2 text-3xl font-black text-sky-300">3</p>
+                </div>
+
+                <div class="rounded-3xl border border-slate-700 bg-slate-950/40 p-5">
+                  <p class="text-xs font-black uppercase tracking-widest text-slate-500">${isChallenge ? "Tiempo" : "Energía"}</p>
+                  <p class="mt-2 text-3xl font-black text-cyan-200">${isChallenge ? "90s" : "100%"}</p>
+                </div>
+              </div>
+
+              <div class="mt-6 rounded-3xl border border-slate-700 bg-slate-950/40 p-5">
+                <p class="text-sm font-black text-white">Reglas</p>
+                <ul class="mt-3 space-y-2 text-sm leading-6 text-slate-400">
+                  <li>• Respuesta correcta al primer intento: más puntos.</li>
+                  <li>• Respuesta incorrecta: recibes una pista, no la respuesta.</li>
+                  <li>• Cada racha correcta aumenta tu bonificación.</li>
+                  <li>• La energía baja cuando fallas.</li>
+                </ul>
+              </div>
+
+              <div class="mt-6 flex flex-wrap gap-3">
+                <button
+                  class="rounded-2xl bg-sky-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-sky-300 focus:outline-none focus:ring-4 focus:ring-sky-400/30"
+                  data-start-quiz="${mode}"
+                  type="button"
+                >
+                  ${isChallenge ? "Iniciar desafío" : "Iniciar entrenamiento"}
+                </button>
+
+                <button
+                  class="rounded-2xl border border-slate-600 px-5 py-3 text-sm font-black text-slate-200 transition hover:border-sky-300/60 hover:text-sky-200"
+                  data-nav="flashcards"
+                  type="button"
+                >
+                  Repasar antes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function startQuiz(mode) {
+      clearTimer();
+      appState.activeGame = createGame(mode);
+      setView(mode === "challenge" ? "challenge" : "quiz");
+
+      if (mode === "challenge") {
+        startTimer();
+      }
+
+      renderQuestion();
+      updateStats();
+    }
+
+    function currentGameTarget() {
+      if (!appState.activeGame) return views.quiz;
+      return appState.activeGame.mode === "challenge" ? views.challenge : views.quiz;
+    }
+
+    function renderQuestion() {
+      const game = appState.activeGame;
+
+      if (!game) return;
+
+      if (game.index >= game.questions.length || game.energy <= 0) {
+        renderFinalScreen();
+        return;
+      }
+
+      const question = game.questions[game.index];
+      const progressPercent = Math.round((game.index / game.questions.length) * 100);
+      const target = currentGameTarget();
+
+      target.innerHTML = `
+        <div class="panel mx-auto max-w-4xl rounded-[2rem] p-6 md:p-8 fade-in">
+          <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p class="text-xs font-black uppercase tracking-[0.24em] text-sky-300">
+                Pregunta ${game.index + 1} de ${game.questions.length}
+              </p>
+              <p class="mt-1 text-sm font-semibold text-slate-400">
+                ${game.mode === "challenge" ? "Modo desafío activo" : "Modo entrenamiento activo"}
+              </p>
+            </div>
+
+            ${game.mode === "challenge" ? `
+              <div class="rounded-2xl border border-sky-300/20 bg-sky-400/10 px-4 py-3">
+                <p class="text-xs font-black uppercase tracking-widest text-slate-400">Tiempo</p>
+                <p class="text-2xl font-black text-sky-200" id="timerText">${game.timeLeft}s</p>
+              </div>
+            ` : `
+              <div class="rounded-2xl border border-slate-700 bg-slate-950/40 px-4 py-3">
+                <p class="text-xs font-black uppercase tracking-widest text-slate-500">Intentos en esta pregunta</p>
+                <p class="text-2xl font-black text-sky-200">${game.attempts}</p>
+              </div>
+            `}
+          </div>
+
+          <div class="mb-8">
+            <div class="mb-2 flex justify-between text-xs font-bold text-slate-500">
+              <span>Progreso</span>
+              <span>${progressPercent}%</span>
+            </div>
+            <div class="h-3 overflow-hidden rounded-full bg-slate-800">
+              <div class="h-full rounded-full bg-sky-400 transition-all duration-500" style="width: ${progressPercent}%"></div>
+            </div>
+
+            ${game.mode === "challenge" ? `
+              <div class="mt-4 h-2 overflow-hidden rounded-full bg-slate-800">
+                <div id="timerBar" class="h-full rounded-full bg-cyan-300 transition-all duration-500" style="width: ${(game.timeLeft / 90) * 100}%"></div>
+              </div>
+            ` : ""}
+          </div>
+
+          <div class="rounded-[1.5rem] border border-slate-700 bg-slate-950/40 p-5 md:p-6">
+            <h3 class="text-2xl font-black leading-tight text-white md:text-3xl">
+              ${escapeHTML(question.question)}
+            </h3>
+          </div>
+
+          <div class="mt-6 grid gap-3" id="optionsList">
+            ${question.options.map((option, index) => `
+              <button
+                class="quiz-option rounded-2xl border border-slate-700 bg-slate-900/70 px-5 py-4 text-left text-sm font-bold leading-6 text-slate-200 transition hover:border-sky-300/60 hover:bg-sky-400/10 focus:outline-none focus:ring-4 focus:ring-sky-400/20 ${game.selectedIndex === index ? "option-selected" : ""}"
+                data-option-index="${index}"
+                type="button"
+                ${game.locked ? "disabled" : ""}
+              >
+                <span class="mr-3 inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-xs font-black text-sky-300 ring-1 ring-slate-700">
+                  ${String.fromCharCode(65 + index)}
+                </span>
+                ${escapeHTML(option)}
+              </button>
+            `).join("")}
+          </div>
+
+          <div id="feedbackArea" class="mt-6">
+            ${renderFeedback()}
+          </div>
+
+          <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button
+              class="rounded-2xl border border-slate-600 px-5 py-3 text-sm font-black text-slate-300 transition hover:border-sky-300/60 hover:text-sky-200"
+              data-restart-mode="${game.mode}"
+              type="button"
+            >
+              Reiniciar
+            </button>
+
+            <button
+              class="rounded-2xl bg-sky-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-sky-300 focus:outline-none focus:ring-4 focus:ring-sky-400/30"
+              ${game.locked ? "data-next-question" : "data-submit-answer"}
+              type="button"
+            >
+              ${game.locked ? (game.index === game.questions.length - 1 ? "Ver resultado" : "Siguiente pregunta") : "Comprobar respuesta"}
+            </button>
+          </div>
+        </div>
+      `;
+
+      updateStats();
+    }
+
+    function renderFeedback() {
+      const game = appState.activeGame;
+
+      if (!game || !game.feedback) {
+        return `
+          <div class="rounded-2xl border border-slate-700 bg-slate-950/30 p-5 text-sm leading-6 text-slate-400">
+            Selecciona una opción y comprueba tu respuesta.
+          </div>
+        `;
+      }
+
+      if (game.feedback.type === "empty") {
+        return `
+          <div class="rounded-2xl border border-slate-600 bg-slate-800/60 p-5">
+            <p class="font-black text-white">Selecciona una respuesta.</p>
+            <p class="mt-1 text-sm leading-6 text-slate-400">Debes elegir una opción antes de comprobar.</p>
+          </div>
+        `;
+      }
+
+      if (game.feedback.type === "scaffold") {
+        return `
+          <div class="rounded-2xl border border-sky-300/25 bg-sky-400/10 p-5">
+            <div class="flex items-start gap-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-sky-400/15 text-sky-200 ring-1 ring-sky-300/25">
+                ↗
+              </div>
+              <div>
+                <p class="font-black text-sky-100">Andamiaje ${Math.min(game.attempts, 3)} / 3</p>
+                <p class="mt-2 text-sm leading-6 text-slate-300">${escapeHTML(game.feedback.message)}</p>
+                <p class="mt-3 text-xs font-black uppercase tracking-widest text-sky-300">
+                  Intenta de nuevo. La respuesta correcta no se revela todavía.
+                </p>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (game.feedback.type === "correct") {
+        return `
+          <div class="rounded-2xl border border-cyan-300/25 bg-cyan-400/10 p-5">
+            <div class="flex items-start gap-4">
+              <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/25">
+                ✓
+              </div>
+              <div>
+                <p class="font-black text-cyan-100">Correcto</p>
+                <p class="mt-2 text-sm leading-6 text-slate-300">
+                  ${escapeHTML(game.feedback.message)}
+                </p>
+                <p class="mt-3 text-xs font-black uppercase tracking-widest text-cyan-300">
+                  +${game.feedback.points} puntos
+                </p>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      return "";
+    }
+
+    function selectOption(index) {
+      const game = appState.activeGame;
+
+      if (!game || game.locked) return;
+
+      game.selectedIndex = index;
+      game.feedback = null;
+      renderQuestion();
+    }
+
+    function submitAnswer() {
+      const game = appState.activeGame;
+
+      if (!game || game.locked) return;
+
+      if (game.selectedIndex === null) {
+        game.feedback = { type: "empty" };
+        renderQuestion();
+        return;
+      }
+
+      const question = game.questions[game.index];
+      const selectedAnswer = question.options[game.selectedIndex];
+      const isCorrect = selectedAnswer === question.answer;
+
+      if (isCorrect) {
+        const points = calculatePoints(game);
+        game.score += points;
+        game.streak += 1;
+        game.maxStreak = Math.max(game.maxStreak, game.streak);
+        appState.maxStreakGlobal = Math.max(appState.maxStreakGlobal, game.maxStreak);
+        localStorage.setItem("vygotskyMaxStreak", appState.maxStreakGlobal);
+
+        game.locked = true;
+        game.feedback = {
+          type: "correct",
+          points,
+          message: "Has conectado correctamente el concepto con su significado dentro de la teoría revisada."
+        };
+
+        renderQuestion();
+        markCorrectOption();
+        updateStats();
+        return;
+      }
+
+      game.attempts += 1;
+      game.streak = 0;
+      game.energy = Math.max(0, game.energy - (game.mode === "challenge" ? 18 : 12));
+
+      const scaffoldIndex = Math.min(game.attempts - 1, question.scaffolds.length - 1);
+      game.feedback = {
+        type: "scaffold",
+        message: question.scaffolds[scaffoldIndex]
+      };
+
+      renderQuestion();
+      markWrongOption();
+
+      if (game.energy <= 0) {
+        setTimeout(() => {
+          renderFinalScreen();
+        }, 700);
+      }
+
+      updateStats();
+    }
+
+    function calculatePoints(game) {
+      const base = game.attempts === 0 ? 100 : game.attempts === 1 ? 70 : 40;
+      const streakBonus = Math.min(game.streak * 10, 30);
+      const modeBonus = game.mode === "challenge" ? 15 : 0;
+      return base + streakBonus + modeBonus;
+    }
+
+    function markCorrectOption() {
+      const game = appState.activeGame;
+      const question = game.questions[game.index];
+
+      document.querySelectorAll(".quiz-option").forEach(button => {
+        const index = Number(button.dataset.optionIndex);
+        const option = question.options[index];
+
+        if (option === question.answer) {
+          button.classList.add("option-correct");
+        }
+      });
+    }
+
+    function markWrongOption() {
+      const game = appState.activeGame;
+
+      document.querySelectorAll(".quiz-option").forEach(button => {
+        const index = Number(button.dataset.optionIndex);
+
+        if (index === game.selectedIndex) {
+          button.classList.add("option-wrong");
+        }
+      });
+    }
+
+    function nextQuestion() {
+      const game = appState.activeGame;
+
+      if (!game) return;
+
+      game.index += 1;
+      game.selectedIndex = null;
+      game.attempts = 0;
+      game.locked = false;
+      game.feedback = null;
+
+      if (game.index >= game.questions.length) {
+        renderFinalScreen();
+        return;
+      }
+
+      renderQuestion();
+    }
+
+    function renderFinalScreen() {
+      const game = appState.activeGame;
+
+      if (!game) return;
+
+      clearTimer();
+
+      const target = currentGameTarget();
+      const completedQuestions = Math.min(game.index, game.questions.length);
+      const level = getLevel(game.score);
+      const badges = getBadges(game);
+
+      if (game.score > appState.bestScore) {
+        appState.bestScore = game.score;
+        localStorage.setItem("vygotskyBestScore", appState.bestScore);
+      }
+
+      target.innerHTML = `
+        <div class="panel mx-auto max-w-4xl rounded-[2rem] p-6 md:p-8 fade-in">
+          <div class="text-center">
+            <span class="inline-flex rounded-full border border-sky-300/25 bg-sky-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.24em] text-sky-200">
+              Resultado final
+            </span>
+
+            <h3 class="mt-6 text-4xl font-black text-white md:text-5xl">
+              ${level.name}
+            </h3>
+
+            <p class="mx-auto mt-4 max-w-2xl text-sm leading-7 text-slate-400">
+              Completaste una sesión de repaso basada en conceptos clave de Lev Vygotsky.
+            </p>
+          </div>
+
+          <div class="mt-8 grid gap-4 md:grid-cols-4">
+            <div class="rounded-3xl border border-slate-700 bg-slate-950/40 p-5 text-center">
+              <p class="text-xs font-black uppercase tracking-widest text-slate-500">Puntos</p>
+              <p class="mt-2 text-3xl font-black text-white">${game.score}</p>
+            </div>
+
+            <div class="rounded-3xl border border-slate-700 bg-slate-950/40 p-5 text-center">
+              <p class="text-xs font-black uppercase tracking-widest text-slate-500">Racha máxima</p>
+              <p class="mt-2 text-3xl font-black text-sky-300">${game.maxStreak}</p>
+            </div>
+
+            <div class="rounded-3xl border border-slate-700 bg-slate-950/40 p-5 text-center">
+              <p class="text-xs font-black uppercase tracking-widest text-slate-500">Energía</p>
+              <p class="mt-2 text-3xl font-black text-cyan-200">${game.energy}%</p>
+            </div>
+
+            <div class="rounded-3xl border border-slate-700 bg-slate-950/40 p-5 text-center">
+              <p class="text-xs font-black uppercase tracking-widest text-slate-500">Preguntas</p>
+              <p class="mt-2 text-3xl font-black text-blue-200">${completedQuestions}/${game.questions.length}</p>
+            </div>
+          </div>
+
+          <div class="mt-8 rounded-[1.5rem] border border-sky-300/20 bg-sky-400/10 p-6">
+            <p class="text-sm font-black uppercase tracking-[0.2em] text-sky-200">Insignias obtenidas</p>
+
+            <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              ${badges.map(badge => `
+                <div class="rounded-2xl border border-slate-700 bg-slate-950/40 p-4">
+                  <p class="font-black text-white">${escapeHTML(badge.title)}</p>
+                  <p class="mt-1 text-sm leading-6 text-slate-400">${escapeHTML(badge.description)}</p>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+
+          <div class="mt-8 rounded-[1.5rem] border border-slate-700 bg-slate-950/40 p-6">
+            <p class="text-sm font-black text-white">Conceptos repasados</p>
+            <p class="mt-3 text-sm leading-7 text-slate-400">
+              Ley Genética General del Desarrollo, Mediación Semiótica, Zona de Desarrollo Próximo, Andamiaje, Doble Estimulación Funcional, Bloques de Vygotsky-Sájarov, Investigaciones de Luria y Rol del Docente.
+            </p>
+          </div>
+
+          <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              class="rounded-2xl bg-sky-400 px-5 py-3 text-sm font-black text-slate-950 transition hover:bg-sky-300 focus:outline-none focus:ring-4 focus:ring-sky-400/30"
+              data-restart-mode="${game.mode}"
+              type="button"
+            >
+              Jugar de nuevo
+            </button>
+
+            <button
+              class="rounded-2xl border border-slate-600 px-5 py-3 text-sm font-black text-slate-200 transition hover:border-sky-300/60 hover:text-sky-200"
+              data-nav="flashcards"
+              type="button"
+            >
+              Volver a estudiar
+            </button>
+          </div>
+        </div>
+      `;
+
+      updateStats();
+    }
+
+    function getBadges(game) {
+      const badges = [];
+
+      if (game.score >= 400) {
+        badges.push({
+          title: "Dominio conceptual",
+          description: "Obtuviste un puntaje alto conectando conceptos y definiciones."
+        });
+      }
+
+      if (game.maxStreak >= 3) {
+        badges.push({
+          title: "Racha de mediación",
+          description: "Encadenaste varias respuestas correctas de forma consecutiva."
+        });
+      }
+
+      if (game.energy >= 70) {
+        badges.push({
+          title: "Energía cognitiva alta",
+          description: "Conservaste buena energía durante el reto."
+        });
+      }
+
+      if (game.mode === "challenge") {
+        badges.push({
+          title: "Reto cronometrado",
+          description: "Participaste en el modo desafío contra el tiempo."
+        });
+      }
+
+      if (appState.reviewedCards.size >= 4) {
+        badges.push({
+          title: "Explorador de tarjetas",
+          description: "Revisaste varias tarjetas de estudio antes o durante la sesión."
+        });
+      }
+
+      if (badges.length === 0) {
+        badges.push({
+          title: "Aprendiz en progreso",
+          description: "Completaste una práctica y puedes reforzar los conceptos con las tarjetas."
+        });
+      }
+
+      return badges;
+    }
+
+    function startTimer() {
+      clearTimer();
+
+      appState.timerId = setInterval(() => {
+        const game = appState.activeGame;
+
+        if (!game || game.mode !== "challenge") {
+          clearTimer();
+          return;
+        }
+
+        game.timeLeft -= 1;
+
+        const timerText = document.getElementById("timerText");
+        const timerBar = document.getElementById("timerBar");
+
+        if (timerText) timerText.textContent = `${game.timeLeft}s`;
+        if (timerBar) timerBar.style.width = `${Math.max(0, (game.timeLeft / 90) * 100)}%`;
+
+        if (game.timeLeft <= 0) {
+          game.endedByTime = true;
+          clearTimer();
+          renderFinalScreen();
+        }
+      }, 1000);
+    }
+
+    function clearTimer() {
+      if (appState.timerId) {
+        clearInterval(appState.timerId);
+        appState.timerId = null;
+      }
+    }
+
+    function restartMode(mode) {
+      startQuiz(mode);
+    }
+
+    document.addEventListener("click", event => {
+      const navButton = event.target.closest("[data-nav]");
+      const startButton = event.target.closest("[data-start-quiz]");
+      const flipCard = event.target.closest("[data-flip-card]");
+      const optionButton = event.target.closest("[data-option-index]");
+      const submitButton = event.target.closest("[data-submit-answer]");
+      const nextButton = event.target.closest("[data-next-question]");
+      const restartButton = event.target.closest("[data-restart-mode]");
+
+      if (navButton) {
+        setView(navButton.dataset.nav);
+      }
+
+      if (startButton) {
+        startQuiz(startButton.dataset.startQuiz);
+      }
+
+      if (flipCard) {
+        const cardIndex = Number(flipCard.dataset.flipCard);
+        flipCard.classList.toggle("is-flipped");
+
+        if (!appState.reviewedCards.has(cardIndex)) {
+          appState.reviewedCards.add(cardIndex);
+          updateStats();
+        }
+      }
+
+      if (optionButton) {
+        selectOption(Number(optionButton.dataset.optionIndex));
+      }
+
+      if (submitButton) {
+        submitAnswer();
+      }
+
+      if (nextButton) {
+        nextQuestion();
+      }
+
+      if (restartButton) {
+        restartMode(restartButton.dataset.restartMode);
+      }
+    });
+
+    renderFlashcards();
+    setView("flashcards");
+    updateStats();
+  </script>
+</body>
+</html>
